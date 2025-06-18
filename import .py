@@ -16,8 +16,8 @@ st.set_page_config(page_title="🧬 GEO Explorer", layout="wide")
 st.title("🧬 AI-Powered GEO Explorer: Biomedical Insights with RAG")
 
 # Load Gemini API key
-api_key = st.secrets["GEMINI_API_KEY"]
-genai.configure(api_key="AIzaSyALWwif_Sw8e6DX4tgOFrBzHBciYo9LQ7g")
+api_key = st.secrets["AIzaSyALWwif_Sw8e6DX4tgOFrBzHBciYo9LQ7g"]
+genai.configure(api_key=api_key)
 
 # -----------------------------
 # 🧠 LLM + Embedding Setup
