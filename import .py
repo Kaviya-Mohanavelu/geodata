@@ -1,7 +1,7 @@
+
 import os
-import sys
+import time
 import streamlit as st
-import pandas as pd
 from Bio import Entrez
 from tqdm import tqdm
 from langchain.schema.document import Document
@@ -12,15 +12,15 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import google.generativeai as genai
 
 # -----------------------------
-# 🔐 API Configuration
+# 🔐 Configuration
 # -----------------------------
-os.environ["GOOGLE_API_KEY"] = "AIzaSyALWwif_Sw8e6DX4tgOFrBzHBciYo9LQ7g"
-Entrez.api_key = "2546a5ffeb7525d1d3edb654c2f618dd0709"
+os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+Entrez.api_key = st.secrets["NCBI_API_KEY"]
 Entrez.email = "kaviyamohanavelu@gmail.com"
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
 # -----------------------------
-# 🤖 Gemini Model Selection
+# 🤖 Select Gemini Model
 # -----------------------------
 def get_best_supported_model():
     preferred_models = [
@@ -39,30 +39,32 @@ def get_best_supported_model():
     raise Exception("❌ No supported Gemini models found.")
 
 # -----------------------------
-# 📡 GEO Data Functions
+# 🔍 GEO Functions
 # -----------------------------
 def fetch_geo_data(term, organism=None, platform=None):
     query = term
-    if organism:
+    if organism and organism.lower() != "no":
         query += f" AND {organism}[Organism]"
-    if platform:
+    if platform and platform.lower() != "no":
         query += f" AND {platform}[Platform]"
 
     handle = Entrez.esearch(db="gds", term=query, usehistory="y", retmax=0)
     record = Entrez.read(handle)
     handle.close()
 
-    total = int(record["Count"])
-    if total == 0:
+    if int(record["Count"]) == 0:
         return [], 0
 
-    ids = []
     webenv = record["WebEnv"]
     query_key = record["QueryKey"]
+    total = int(record["Count"])
+
+    ids = []
     for start in range(0, total, 500):
+        time.sleep(0.4)
         handle = Entrez.esearch(
-            db="gds", term=query, retstart=start, retmax=500,
-            usehistory="y", webenv=webenv, query_key=query_key
+            db="gds", term=query, retstart=start, retmax=500, usehistory="y",
+            webenv=webenv, query_key=query_key
         )
         chunk = Entrez.read(handle)
         ids.extend(chunk["IdList"])
@@ -75,16 +77,17 @@ def fetch_geo_metadata(id_list):
         try:
             summary = Entrez.esummary(db="gds", id=gid, retmode="xml")
             record = Entrez.read(summary)[0]
+            sample_size = str(record.get("n_samples", "N/A"))
             results.append({
                 "Title": record.get("title", "N/A"),
                 "Summary": record.get("summary", "N/A"),
                 "Organism": record.get("taxon", "N/A"),
                 "Experiment Type": record.get("gdsType", "N/A"),
                 "Platform": record.get("GPL", "N/A"),
-                "Sample Size": record.get("n_samples", "N/A"),
+                "Sample Size": sample_size,
             })
         except Exception as e:
-            print(f"❌ Error for {gid}: {e}")
+            st.warning(f"❌ Error for {gid}: {e}")
     return results
 
 def create_docs_from_metadata(metadata):
@@ -97,62 +100,55 @@ def create_docs_from_metadata(metadata):
 # -----------------------------
 # 🚀 Streamlit App
 # -----------------------------
-st.set_page_config(page_title="🧬 GEO Explorer", layout="centered")
-st.title("🧬 AI-Powered GEO Explorer")
+st.set_page_config(page_title="🧬 GEO + Gemini Explorer")
+st.title("🧬 AI-Powered GEO Explorer: Biomedical Insights with RAG")
 
-query = st.text_input("🔍 Enter keyword, accession number, or author/contributor name")
-organism = st.text_input("🧬 Organism (optional)")
-platform = st.text_input("📟 Platform (optional)")
+query = st.text_input("🔎 Enter keyword, accession number, or author/contributor name")
+organism = st.text_input("🧬 Filter by organism (optional)")
+platform = st.text_input("📟 Filter by platform (optional)")
 
-if st.button("Search GEO"):
-    if not query:
-        st.warning("Please enter a search query.")
-        st.stop()
-
-    with st.spinner("🔎 Searching GEO database..."):
+if st.button("Search GEO Datasets"):
+    with st.spinner("🔍 Searching GEO database..."):
         ids, total = fetch_geo_data(query, organism, platform)
 
-    if not ids:
+    if total == 0:
         st.error("❌ No datasets found. Try a different query.")
-        st.stop()
+    else:
+        st.success(f"✅ Found {total} matching GEO datasets.")
+        metadata = fetch_geo_metadata(ids)
+        st.dataframe(metadata)
 
-    metadata = fetch_geo_metadata(ids)
-    if not metadata:
-        st.error("❌ No metadata retrieved.")
-        st.stop()
+        docs = create_docs_from_metadata(metadata)
+        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        vectordb = Chroma.from_documents(
+            docs, embedding=embeddings, persist_directory="./chromadb"
+        )
 
-    st.success(f"✅ Fetched {len(metadata)} datasets.")
-    st.dataframe(pd.DataFrame(metadata))
-
-    docs = create_docs_from_metadata(metadata)
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    vectordb = Chroma.from_documents(
-        docs, embedding=embeddings, persist_directory="./chromadb"
-    )
-
-    try:
         model_name = get_best_supported_model()
         llm = ChatGoogleGenerativeAI(model=model_name)
-        qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=vectordb.as_retriever())
-    except Exception as e:
-        st.error(f"❌ QA failed: {e}")
-        st.stop()
 
+        qa_chain = RetrievalQA.from_chain_type(
+            llm=llm, retriever=vectordb.as_retriever()
+        )
+
+        st.session_state.qa_chain = qa_chain
+        st.session_state.vectordb = vectordb
+        st.session_state.active = True
+
+if st.session_state.get("active"):
     st.subheader("❓ Ask a question about the datasets")
-    question = st.text_input("Enter your question here")
-
+    question = st.text_input("Enter your biomedical question")
     if st.button("Get Answer"):
-        if not question:
-            st.warning("Please enter a question.")
-            st.stop()
-        try:
-            answer = qa_chain.run(question)
-            st.markdown("### 🧠 Answer")
-            st.info(answer)
+        with st.spinner("💬 Generating answer using Gemini..."):
+            try:
+                answer = st.session_state.qa_chain.run(question)
+                st.success("🧠 Answer:")
+                st.write(answer)
 
-            retrieved_docs = vectordb.similarity_search(question, k=3)
-            st.markdown("### 📚 Top 3 Relevant Dataset Descriptions")
-            for i, doc in enumerate(retrieved_docs):
-                st.markdown(f"**Doc {i+1}:**\n{doc.page_content}")
-        except Exception as e:
-            st.error(f"❌ Error during QA: {e}")
+                st.markdown("### 📚 Top Relevant Datasets:")
+                retrieved_docs = st.session_state.vectordb.similarity_search(question, k=3)
+                for doc in retrieved_docs:
+                    st.markdown("---")
+                    st.markdown(doc.page_content)
+            except Exception as e:
+                st.error(f"❌ QA failed: {e}")
