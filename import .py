@@ -1,4 +1,4 @@
-
+# geo_gemini_app.py
 import os
 import time
 import streamlit as st
@@ -14,8 +14,8 @@ import google.generativeai as genai
 # -----------------------------
 # 🔐 Configuration
 # -----------------------------
-os.environ["GOOGLE_API_KEY"] = st.secrets["AIzaSyALWwif_Sw8e6DX4tgOFrBzHBciYo9LQ7g"]
-Entrez.api_key = st.secrets["2546a5ffeb7525d1d3edb654c2f618dd0709"]
+os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+Entrez.api_key = st.secrets["NCBI_API_KEY"]
 Entrez.email = "kaviyamohanavelu@gmail.com"
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
