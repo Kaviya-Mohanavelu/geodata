@@ -17,7 +17,7 @@ st.title("🧬 AI-Powered GEO Explorer: Biomedical Insights with RAG")
 
 # Load Gemini API key
 api_key = st.secrets["GEMINI_API_KEY"]
-genai.configure(api_key=api_key)
+genai.configure(api_key="AIzaSyALWwif_Sw8e6DX4tgOFrBzHBciYo9LQ7g")
 
 # -----------------------------
 # 🧠 LLM + Embedding Setup
@@ -30,7 +30,7 @@ embedding = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L
 # -----------------------------
 @st.cache_data(show_spinner=False)
 def fetch_geo_data(query, organism=None, platform=None, max_results=100):
-    Entrez.email = "your_email@example.com"
+    Entrez.email = "kaviyamohanavelu@gmail.com"
     search_term = query
     if organism:
         search_term += f" AND {organism}[Organism]"
