@@ -124,11 +124,11 @@ if st.button("🔍 Search GEO Datasets"):
                     st.error("❌ No valid documents for vector store.")
                 else:
                     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-                    vectordb = Chroma.from_documents(
-                        docs,
-                        embedding=embeddings,
-                        persist_directory="./chromadb"
-                    )
+                    from langchain.vectorstores import FAISS
+...
+                      vectordb = FAISS.from_documents(
+                       docs,embedding=embeddings)
+
                     model_name = get_best_supported_model()
                     llm = ChatGoogleGenerativeAI(model=model_name)
                     qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=vectordb.as_retriever())
