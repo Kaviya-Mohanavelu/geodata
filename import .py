@@ -1,4 +1,3 @@
-
 import os
 import sys
 import streamlit as st
@@ -7,7 +6,7 @@ from Bio import Entrez
 from tqdm import tqdm
 from langchain.schema.document import Document
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
+from langchain.vectorstores import FAISS
 from langchain.chains import RetrievalQA
 from langchain_google_genai import ChatGoogleGenerativeAI
 import google.generativeai as genai
@@ -15,9 +14,9 @@ import google.generativeai as genai
 # -----------------------------
 # 🔐 Configuration
 # -----------------------------
-os.environ["GOOGLE_API_KEY"] = "AIzaSyALWwif_Sw8e6DX4tgOFrBzHBciYo9LQ7g"
-Entrez.api_key = "2546a5ffeb7525d1d3edb654c2f618dd0709"
-Entrez.email = "kaviyamohanavelu@gmail.com"
+os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+Entrez.api_key = st.secrets["NCBI_API_KEY"]
+Entrez.email = st.secrets["EMAIL"]
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
 # -----------------------------
@@ -97,7 +96,7 @@ def create_docs_from_metadata(metadata):
 # -----------------------------
 # Streamlit UI
 # -----------------------------
-st.title(" AI-Powered GEO Explorer: Biomedical Insights with RAG")
+st.title("🧬 AI-Powered GEO Explorer: Biomedical Insights with RAG")
 query = st.text_input("🔎 Enter keyword, accession number, or author/contributor name")
 organism = st.text_input("🧬 Filter by organism (optional)")
 platform = st.text_input("📟 Filter by platform (optional)")
@@ -124,9 +123,10 @@ if st.button("🔍 Search GEO Datasets"):
                     st.error("❌ No valid documents for vector store.")
                 else:
                     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-                    from langchain.vectorstores import FAISS
-                     vectordb = FAISS.from_documents(docs,embedding=embeddings)
-
+                    vectordb = FAISS.from_documents(
+                        docs,
+                        embedding=embeddings
+                    )
                     model_name = get_best_supported_model()
                     llm = ChatGoogleGenerativeAI(model=model_name)
                     qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=vectordb.as_retriever())
@@ -134,6 +134,9 @@ if st.button("🔍 Search GEO Datasets"):
                     st.session_state["qa_chain"] = qa_chain
                     st.session_state["vectordb"] = vectordb
 
+# -----------------------------
+# QA Interface
+# -----------------------------
 if "qa_chain" in st.session_state:
     st.subheader("💬 Ask a question about the datasets")
     user_question = st.text_input("❓ Your Question")
