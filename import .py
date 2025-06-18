@@ -125,9 +125,7 @@ if st.button("🔍 Search GEO Datasets"):
                 else:
                     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
                     from langchain.vectorstores import FAISS
-...
-                      vectordb = FAISS.from_documents(
-                       docs,embedding=embeddings)
+                     vectordb = FAISS.from_documents(docs,embedding=embeddings)
 
                     model_name = get_best_supported_model()
                     llm = ChatGoogleGenerativeAI(model=model_name)
