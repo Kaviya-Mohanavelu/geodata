@@ -11,4 +11,5 @@ torch
 faiss-cpu
 numpy
 pandas
-Bio
+biopython
+
